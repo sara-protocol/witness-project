@@ -1,0 +1,19 @@
+name: Validate MCP registry
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r mcp-server/requirements.txt
+      - run: python mcp-server/test_client.py
+      - run: python -c "import csv, pathlib; [list(csv.DictReader(open(p, encoding='utf-8-sig'))) for p in pathlib.Path('registry').glob('*.csv')]; print('CSV parse OK')"
