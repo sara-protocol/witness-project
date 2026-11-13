@@ -1,25 +1,14 @@
 """
-Witness Project MCP Server — READ-ONLY.
-
-Reads registry/*.csv from the local clone.
-Never writes, never opens PRs, never changes ratings.
-
-Requires: pip install mcp
-Run: python server.py
-Env: WITNESS_REGISTRY_DIR (default: ../registry relative to this file)
+Witness Project MCP Server — READ-ONLY. Compatible with mcp 2.x.
 """
-import os, csv, pathlib, json
+import os, csv, pathlib, json, sys
 
-try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError:
-    raise SystemExit("Install first: pip install mcp")
+from mcp.server.fastmcp import FastMCP
 
 REGISTRY_DIR = pathlib.Path(os.environ.get(
     "WITNESS_REGISTRY_DIR",
     pathlib.Path(__file__).parent.parent / "registry"
 ))
-
 STATUS = "v0.2 backfilled, NOT frozen. E-M-T-L-I formal ratings pending Method Manual v1.0. Do not cite as peer-reviewed conclusion."
 
 mcp = FastMCP("witness-project")
@@ -42,20 +31,14 @@ def _read(kind: str):
         return list(csv.DictReader(f))
 
 def _wrap(kind: str, rows):
-    return {
-        "status": STATUS,
-        "ai_label": "ai-assisted",
-        "source": f"registry/{FILE_MAP[kind]}",
-        "count": len(rows),
-        "rows": rows,
-    }
+    return {"status": STATUS, "ai_label": "ai-assisted", "source": f"registry/{FILE_MAP[kind]}", "count": len(rows), "rows": rows}
 
 def _find(kind: str, key_field: str, key: str):
     rows = _read(kind)
     for r in rows:
         if (r.get(key_field) or "").strip().upper() == key.strip().upper():
             return {"status": STATUS, "ai_label": "ai-assisted", "row": r}
-    return {"status": STATUS, "error": f"{key} not found in {kind}", "available": [r.get(key_field) for r in rows[:50]]}
+    return {"status": STATUS, "error": f"{key} not found in {kind}"}
 
 @mcp.tool()
 def list_claims() -> dict:
@@ -74,7 +57,7 @@ def list_concepts() -> dict:
 
 @mcp.tool()
 def get_concept(concept_id: str) -> dict:
-    """Get one concept by ID, e.g. C-005a, C-005b, C-005c."""
+    """Get one concept by ID, e.g. C-005a."""
     return _find("concepts", "Concept ID", concept_id)
 
 @mcp.tool()
@@ -114,9 +97,7 @@ def search_registry(query: str) -> dict:
                 hits.append({"kind": kind, "row": row})
     return {"status": STATUS, "ai_label": "ai-assisted", "query": query, "count": len(hits), "hits": hits[:30]}
 
-@mcp.resource("witness://status")
-def status_resource() -> str:
-    return json.dumps({"project": "Witness Project", "registry_status": STATUS, "registry_dir": str(REGISTRY_DIR)}, ensure_ascii=False, indent=2)
-
 if __name__ == "__main__":
+    # Print to stderr only, stdout must stay clean for MCP stdio protocol
+    print(f"[witness-project] registry={REGISTRY_DIR} exists={REGISTRY_DIR.exists()}", file=sys.stderr, flush=True)
     mcp.run()
